@@ -1,9 +1,7 @@
 import { useMemo } from "react"
 import { Apple, Download, Monitor, Terminal } from "lucide-react"
-import { Button } from "@/components/ui/button"
-<<<<<<< HEAD
 import { Analytics } from "@vercel/analytics/react"
-=======
+import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
   DOWNLOADS,
@@ -18,7 +16,6 @@ function OsIcon({ os }: { os: DownloadOption["os"] }) {
   if (os === "linux") return <Terminal className="size-4" />
   return <Monitor className="size-4" />
 }
->>>>>>> ed0e56c (feat(website): show OS-aware primary download and all platform links)
 
 export default function App() {
   const os = useMemo(() => detectOs(), [])
@@ -95,14 +92,7 @@ export default function App() {
           ))}
         </ul>
       </div>
-<<<<<<< HEAD
-      <Button size="lg">
-        <Download data-icon="inline-start" />
-        Download
-      </Button>
       <Analytics />
-=======
->>>>>>> ed0e56c (feat(website): show OS-aware primary download and all platform links)
     </div>
   )
 }
