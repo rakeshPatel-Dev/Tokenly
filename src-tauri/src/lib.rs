@@ -59,6 +59,7 @@ pub fn run() {
                 .build()?;
 
             TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
                 .menu(&tray_menu)
                 .tooltip("Tokenly — AI quota tracker")
                 .on_menu_event(|app, event| match event.id().as_ref() {

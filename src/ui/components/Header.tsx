@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, RefreshCw, SlidersHorizontal, Activity } from "lucide-react";
+import { Plus, RefreshCw, SlidersHorizontal } from "lucide-react";
 
 interface Props {
   accountCount: number;
@@ -23,11 +23,11 @@ export const Header: React.FC<Props> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
         {/* Brand & Micro-metrics */}
         <div className="flex items-center gap-3.5">
-          <div className="w-8 h-8 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center ">
-            <div className="w-full h-full bg-[#120e0b] rounded-[15px] flex items-center justify-center">
-              <Activity className="w-4 h-4 text-blue-400" />
-            </div>
-          </div>
+          <img
+            src="/tokenly.svg"
+            alt="Tokenly"
+            className="w-8 h-8 rounded-2xl"
+          />
 
           <div>
             <div className="flex items-center gap-2">
