@@ -22,12 +22,26 @@ Installers are published on
 The download site in [`website/`](./website) links to these assets and
 highlights the build for your OS.
 
+## Release
+
+1. Bump `version` in `package.json` and `src-tauri/tauri.conf.json` (and `Cargo.toml` if needed).
+2. Update `RELEASE_TAG` / `APP_VERSION` in `website/src/lib/downloads.ts` to match.
+3. Push to the `release` branch (or run **Actions → release → Run workflow**).
+
+CI builds Windows / macOS / Linux, creates GitHub Release `vX.Y.Z`, and uploads the installers. Users download from [Releases](https://github.com/rakeshPatel-Dev/Tokenly/releases).
+
+```bash
+git checkout -B release main
+git push -u origin release
+```
+
 ## Develop
 
 ```bash
 pnpm install
 pnpm tauri dev
 ```
+
 
 ### Website
 
