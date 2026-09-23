@@ -1,10 +1,4 @@
 export const GITHUB_REPO = "rakeshPatel-Dev/Tokenly"
-export const RELEASE_TAG = "v0.1.0"
-export const APP_VERSION = "0.1.0"
-
-const releaseAsset = (filename: string) =>
-  `https://github.com/${GITHUB_REPO}/releases/download/${RELEASE_TAG}/${filename}`
-
 export const RELEASES_PAGE = `https://github.com/${GITHUB_REPO}/releases`
 export const LATEST_RELEASE_PAGE = `https://github.com/${GITHUB_REPO}/releases/latest`
 
@@ -25,56 +19,89 @@ export type DownloadOption = {
   url: string
 }
 
-export const DOWNLOADS: DownloadOption[] = [
+type AssetMatch = {
+  id: PlatformId
+  os: DownloadOption["os"]
+  label: string
+  detail: string
+  test: (name: string) => boolean
+}
+
+const ASSET_MATCHERS: AssetMatch[] = [
   {
     id: "windows",
     os: "windows",
     label: "Windows",
     detail: "x64 installer (.exe)",
-    filename: `Tokenly_${APP_VERSION}_x64-setup.exe`,
-    url: releaseAsset(`Tokenly_${APP_VERSION}_x64-setup.exe`),
+    test: (n) => /x64-setup\.exe$/i.test(n) || /_x64_en-US\.msi$/i.test(n),
   },
   {
     id: "macos-arm",
     os: "macos",
     label: "macOS",
     detail: "Apple Silicon (.dmg)",
-    filename: `Tokenly_${APP_VERSION}_aarch64.dmg`,
-    url: releaseAsset(`Tokenly_${APP_VERSION}_aarch64.dmg`),
+    test: (n) => /aarch64\.dmg$/i.test(n),
   },
   {
     id: "macos-intel",
     os: "macos",
     label: "macOS",
     detail: "Intel (.dmg)",
-    filename: `Tokenly_${APP_VERSION}_x64.dmg`,
-    url: releaseAsset(`Tokenly_${APP_VERSION}_x64.dmg`),
+    test: (n) => /x64\.dmg$/i.test(n),
   },
   {
     id: "linux-appimage",
     os: "linux",
     label: "Linux",
     detail: "AppImage (amd64)",
-    filename: `Tokenly_${APP_VERSION}_amd64.AppImage`,
-    url: releaseAsset(`Tokenly_${APP_VERSION}_amd64.AppImage`),
+    test: (n) => /\.AppImage$/i.test(n) && !/\.sig$/i.test(n),
   },
   {
     id: "linux-deb",
     os: "linux",
     label: "Linux",
     detail: "Debian / Ubuntu (.deb)",
-    filename: `Tokenly_${APP_VERSION}_amd64.deb`,
-    url: releaseAsset(`Tokenly_${APP_VERSION}_amd64.deb`),
+    test: (n) => /\.deb$/i.test(n),
   },
   {
     id: "linux-rpm",
     os: "linux",
     label: "Linux",
     detail: "Fedora / RHEL (.rpm)",
-    filename: `Tokenly-${APP_VERSION}-1.x86_64.rpm`,
-    url: releaseAsset(`Tokenly-${APP_VERSION}-1.x86_64.rpm`),
+    test: (n) => /\.rpm$/i.test(n),
   },
 ]
+
+type GhAsset = { name: string; browser_download_url: string }
+type GhRelease = { tag_name: string; assets: GhAsset[] }
+
+export type LatestRelease = {
+  tag: string
+  downloads: DownloadOption[]
+}
+
+export async function fetchLatestRelease(): Promise<LatestRelease | null> {
+  const res = await fetch(
+    `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+    { headers: { Accept: "application/vnd.github+json" } },
+  )
+  if (!res.ok) return null
+  const data = (await res.json()) as GhRelease
+  const downloads: DownloadOption[] = []
+  for (const match of ASSET_MATCHERS) {
+    const asset = data.assets.find((a) => match.test(a.name))
+    if (!asset) continue
+    downloads.push({
+      id: match.id,
+      os: match.os,
+      label: match.label,
+      detail: match.detail,
+      filename: asset.name,
+      url: asset.browser_download_url,
+    })
+  }
+  return downloads.length ? { tag: data.tag_name, downloads } : null
+}
 
 export type DetectedOs = "windows" | "macos" | "linux" | "unknown"
 
@@ -87,16 +114,29 @@ export function detectOs(): DetectedOs {
   return "unknown"
 }
 
-export function preferredDownload(os: DetectedOs): DownloadOption {
-  if (os === "windows") return DOWNLOADS.find((d) => d.id === "windows")!
+export function preferredDownload(
+  os: DetectedOs,
+  downloads: DownloadOption[],
+): DownloadOption | null {
+  if (!downloads.length) return null
+  if (os === "windows")
+    return downloads.find((d) => d.id === "windows") ?? downloads[0]!
   if (os === "macos") {
     const arm =
       typeof navigator !== "undefined" &&
       (navigator.userAgent.includes("ARM") ||
-        // Apple Silicon browsers report MacIntel but can use maxTouchPoints hint
         (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1))
-    return DOWNLOADS.find((d) => d.id === (arm ? "macos-arm" : "macos-intel"))!
+    return (
+      downloads.find((d) => d.id === (arm ? "macos-arm" : "macos-intel")) ??
+      downloads.find((d) => d.os === "macos") ??
+      downloads[0]!
+    )
   }
-  if (os === "linux") return DOWNLOADS.find((d) => d.id === "linux-appimage")!
-  return DOWNLOADS[0]!
+  if (os === "linux")
+    return (
+      downloads.find((d) => d.id === "linux-appimage") ??
+      downloads.find((d) => d.os === "linux") ??
+      downloads[0]!
+    )
+  return downloads[0]!
 }

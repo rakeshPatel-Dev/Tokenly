@@ -6,29 +6,15 @@ Built with Tauri + React + TypeScript.
 
 ## Download
 
-Installers are published on
-[GitHub Releases](https://github.com/rakeshPatel-Dev/Tokenly/releases)
-(`v0.1.0`):
-
-| Platform | Package |
-| --- | --- |
-| Windows x64 | `Tokenly_0.1.0_x64-setup.exe` |
-| macOS Apple Silicon | `Tokenly_0.1.0_aarch64.dmg` |
-| macOS Intel | `Tokenly_0.1.0_x64.dmg` |
-| Linux AppImage | `Tokenly_0.1.0_amd64.AppImage` |
-| Debian / Ubuntu | `Tokenly_0.1.0_amd64.deb` |
-| Fedora / RHEL | `Tokenly-0.1.0-1.x86_64.rpm` |
-
-The download site in [`website/`](./website) links to these assets and
-highlights the build for your OS.
+Installers: [GitHub Releases](https://github.com/rakeshPatel-Dev/Tokenly/releases).  
+The [`website/`](./website) fetches the latest release assets automatically.
 
 ## Release
 
-1. Bump `version` in `package.json` and `src-tauri/tauri.conf.json` (and `Cargo.toml` if needed).
-2. Update `RELEASE_TAG` / `APP_VERSION` in `website/src/lib/downloads.ts` to match.
-3. Push to the `release` branch (or run **Actions → release → Run workflow**).
+1. Bump `version` in `package.json` and `src-tauri/tauri.conf.json` (keep `Cargo.toml` in sync).
+2. Push to `release` (or **Actions → release → Run workflow**).
 
-CI builds Windows / macOS / Linux, creates GitHub Release `vX.Y.Z`, and uploads the installers. Users download from [Releases](https://github.com/rakeshPatel-Dev/Tokenly/releases).
+CI creates the GitHub Release and uploads installers; the website picks them up with no extra edit.
 
 ```bash
 git checkout -B release main
@@ -41,7 +27,6 @@ git push -u origin release
 pnpm install
 pnpm tauri dev
 ```
-
 
 ### Website
 
