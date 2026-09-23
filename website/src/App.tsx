@@ -1,5 +1,6 @@
 import { Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Analytics } from "@vercel/analytics/react"
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Download data-icon="inline-start" />
         Download
       </Button>
+      <Analytics />
     </div>
   )
 }
