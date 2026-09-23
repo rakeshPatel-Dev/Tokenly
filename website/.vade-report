@@ -1,0 +1,44 @@
+# Vercel Web Analytics Installation
+
+Successfully installed and configured Vercel Web Analytics for the Tokenly website project.
+
+## Changes Made
+
+### 1. Package Installation
+- Installed `@vercel/analytics` version 2.0.1 using pnpm
+- Package added to dependencies in `package.json`
+
+### 2. Files Modified
+
+**website/package.json**
+- Added `"@vercel/analytics": "^2.0.1"` to dependencies
+
+**website/pnpm-lock.yaml**
+- Updated lock file with new dependency and its transitive dependencies
+
+**website/src/App.tsx**
+- Added import statement: `import { Analytics } from "@vercel/analytics/react"`
+- Added `<Analytics />` component at the end of the app's JSX structure
+
+## Implementation Details
+
+The implementation follows the latest official Vercel Analytics documentation (fetched from https://vercel.com/docs/analytics/quickstart on September 23, 2026).
+
+For a React + Vite application, the Analytics component was added to the main App component, which is the root component of the application. The component is placed at the end of the JSX structure as recommended by the documentation.
+
+## Verification Steps Completed
+
+1. ✅ Package installed successfully using pnpm
+2. ✅ Build completed successfully (`pnpm run build`)
+3. ✅ Linter ran with no new errors (`pnpm run lint`)
+4. ✅ Lock file properly updated
+5. ✅ All changes staged for commit
+
+## Next Steps
+
+To enable analytics data collection:
+1. Deploy the website to Vercel
+2. Enable Web Analytics in the Vercel dashboard (Analytics section)
+3. Once deployed, verify the setup by checking for `/<unique-path>/view` requests in the browser's Network tab
+
+The Analytics component will automatically start collecting page view data once the site is deployed to Vercel and analytics is enabled in the dashboard.
