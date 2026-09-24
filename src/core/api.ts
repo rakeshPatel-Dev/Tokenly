@@ -232,6 +232,14 @@ export const api = {
     return await invoke<ProviderMetadata[]>("detect_providers");
   },
 
+  async autoImportProfiles(): Promise<Account[]> {
+    if (!isTauri()) {
+      return browserAccounts;
+    }
+    const raw = await invoke<RawAccountRecord[]>("auto_import_profiles");
+    return raw.map(mapAccount);
+  },
+
   async queryCodex(codexHome?: string) {
     if (!isTauri()) {
       return {

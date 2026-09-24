@@ -26,46 +26,9 @@ export function App() {
     try {
       let list = await api.listAccounts();
 
-      // Auto-seed initial default accounts if database is empty
+      // First launch: DB is empty — discover all authenticated profiles automatically
       if (list.length === 0) {
-        const providers = await api.detectProviders();
-        const agyMeta = providers.find((p) => p.provider === "antigravity");
-        const codexMeta = providers.find((p) => p.provider === "codex");
-
-        const seeded: Account[] = [];
-        const now = new Date().toISOString();
-
-        if (agyMeta?.installed) {
-          const newAgy: Account = {
-            id: `antigravity-default`,
-            provider: "antigravity",
-            displayName: "Antigravity Active",
-            authProfileId: "default",
-            enabled: true,
-            createdAt: now,
-            updatedAt: now,
-          };
-          await api.saveAccount(newAgy);
-          seeded.push(newAgy);
-        }
-
-        if (codexMeta?.installed) {
-          const newCodex: Account = {
-            id: `codex-default`,
-            provider: "codex",
-            displayName: "Codex Default",
-            authProfileId: "~/.codex",
-            enabled: true,
-            createdAt: now,
-            updatedAt: now,
-          };
-          await api.saveAccount(newCodex);
-          seeded.push(newCodex);
-        }
-
-        if (seeded.length > 0) {
-          list = seeded;
-        }
+        list = await api.autoImportProfiles();
       }
 
       setAccounts(list);
@@ -96,7 +59,7 @@ export function App() {
           }
         }
         setUsageMap({ ...map });
-        // Reload accounts to get updated metadata
+        // Reload accounts to pick up email / plan written during refresh
         const updated = await api.listAccounts();
         setAccounts(updated);
       }

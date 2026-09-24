@@ -197,9 +197,13 @@ export const AddAccountModal: React.FC<Props> = ({ isOpen, onClose, onAdded }) =
               type="text"
               placeholder={provider === "codex" ? "~/.codex" : "default"}
               value={authProfileId}
-              onChange={(e) => setAuthProfileId(e.target.value)}
+              onChange={(e) => { setAuthProfileId(e.target.value); setTestResult(null); }}
               className="input px-3 py-2 font-mono text-[12.5px]"
             />
+            <p className="mt-1.5 text-[11px] text-[var(--t-ink-8)]">
+              Leave blank for the default profile. To add another account, log it
+              into a separate directory first, then enter that path here.
+            </p>
           </div>
 
           {/* Setup hint */}
@@ -279,8 +283,9 @@ export const AddAccountModal: React.FC<Props> = ({ isOpen, onClose, onAdded }) =
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || !testResult?.success}
             className="btn btn-primary"
+            title={!testResult?.success ? 'Run "Check connection" first' : undefined}
           >
             {isSaving ? (
               <>
