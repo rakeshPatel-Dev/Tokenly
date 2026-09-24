@@ -231,3 +231,150 @@ pub fn set_refresh_intervals(
     scheduler.set_intervals(fg_secs, bg_secs);
     Ok(())
 }
+
+/// Scan the machine for all authenticated agy / codex profiles and import them
+/// as accounts.  Skips gracefully if accounts already exist in the DB.
+///
+/// Called once on first launch (when the DB is empty) so the user sees their
+/// existing accounts without having to add them manually.
+#[tauri::command]
+pub async fn auto_import_profiles(
+    state: State<'_, DbState>,
+) -> Result<Vec<AccountRecord>, String> {
+    // If accounts already exist, return them and skip discovery
+    {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        let existing = db::list_accounts(&conn).map_err(|e| e.to_string())?;
+        if !existing.is_empty() {
+            return Ok(existing);
+        }
+    }
+
+    let mut new_accounts: Vec<AccountRecord> = Vec::new();
+
+    // ── Codex profiles ────────────────────────────────────────────────────────
+    let codex_profiles = codex::discover_codex_profiles();
+    for profile_path in codex_profiles {
+        let path_str = profile_path.to_string_lossy().to_string();
+        let res = {
+            let p = path_str.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                codex::query_codex_rate_limits(Some(&p))
+            })
+            .await
+            .map_err(|e| e.to_string())?
+        };
+
+        if !res.authenticated {
+            continue;
+        }
+
+        let now = chrono::Utc::now().to_rfc3339();
+        let label = res
+            .email
+            .as_deref()
+            .map(|e| format!("Codex ({})", e))
+            .unwrap_or_else(|| "Codex".to_string());
+
+        let acc = AccountRecord {
+            id: format!("codex-{}", uuid::Uuid::new_v4()),
+            provider: "codex".into(),
+            provider_account_id: res.account_id.clone(),
+            email: res.email.clone(),
+            display_name: Some(label),
+            plan: res.plan_type.clone(),
+            auth_profile_id: path_str,
+            enabled: true,
+            last_checked_at: Some(now.clone()),
+            created_at: now.clone(),
+            updated_at: now.clone(),
+        };
+
+        {
+            let conn = state.conn.lock().map_err(|e| e.to_string())?;
+            db::save_account(&conn, &acc).map_err(|e| e.to_string())?;
+            for w in &res.windows {
+                let snap = UsageWindowRecord {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    account_id: acc.id.clone(),
+                    name: w.name.clone(),
+                    window_type: w.window_type.clone(),
+                    used_percent: w.used_percent,
+                    remaining_percent: w.remaining_percent,
+                    used: w.used,
+                    limit: w.limit,
+                    reset_at: w.reset_at.clone(),
+                    source: w.source.clone(),
+                    fetched_at: now.clone(),
+                };
+                let _ = db::save_usage_snapshot(&conn, &snap);
+            }
+        }
+
+        new_accounts.push(acc);
+    }
+
+    // ── Antigravity profiles ──────────────────────────────────────────────────
+    let agy_profiles = antigravity::discover_agy_profiles();
+    for profile_path in agy_profiles {
+        let path_str = profile_path.to_string_lossy().to_string();
+        let res = {
+            let p = path_str.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                antigravity::query_antigravity_usage(Some(&p))
+            })
+            .await
+            .map_err(|e| e.to_string())?
+        };
+
+        if !res.authenticated {
+            continue;
+        }
+
+        let now = chrono::Utc::now().to_rfc3339();
+        let label = res
+            .email
+            .as_deref()
+            .map(|e| format!("Antigravity ({})", e))
+            .unwrap_or_else(|| "Antigravity".to_string());
+
+        let acc = AccountRecord {
+            id: format!("antigravity-{}", uuid::Uuid::new_v4()),
+            provider: "antigravity".into(),
+            provider_account_id: None,
+            email: res.email.clone(),
+            display_name: Some(label),
+            plan: None,
+            auth_profile_id: path_str,
+            enabled: true,
+            last_checked_at: Some(now.clone()),
+            created_at: now.clone(),
+            updated_at: now.clone(),
+        };
+
+        {
+            let conn = state.conn.lock().map_err(|e| e.to_string())?;
+            db::save_account(&conn, &acc).map_err(|e| e.to_string())?;
+            for w in &res.windows {
+                let snap = UsageWindowRecord {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    account_id: acc.id.clone(),
+                    name: w.name.clone(),
+                    window_type: w.window_type.clone(),
+                    used_percent: w.used_percent,
+                    remaining_percent: w.remaining_percent,
+                    used: w.used,
+                    limit: w.limit,
+                    reset_at: w.reset_at.clone(),
+                    source: w.source.clone(),
+                    fetched_at: now.clone(),
+                };
+                let _ = db::save_usage_snapshot(&conn, &snap);
+            }
+        }
+
+        new_accounts.push(acc);
+    }
+
+    Ok(new_accounts)
+}

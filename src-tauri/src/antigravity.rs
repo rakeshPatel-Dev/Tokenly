@@ -106,6 +106,44 @@ pub fn detect_antigravity_account_email_for_home(home_dir: &PathBuf) -> Option<S
     None
 }
 
+/// Discover all agy profile home directories on this machine.
+///
+/// Returns:
+/// - The real `$HOME` if `.gemini/antigravity-cli/` exists there (i.e. `agy` has
+///   been run at least once with the default home).
+/// - Any `~/.agy-<name>` directories the user created for extra accounts
+///   (convention: `HOME=~/.agy-work agy`).
+///
+/// If nothing is found, returns a single entry for the default home so callers
+/// can still attempt a query.
+pub fn discover_agy_profiles() -> Vec<PathBuf> {
+    let mut profiles = Vec::new();
+
+    if let Some(home) = dirs::home_dir() {
+        // Default profile: the real HOME, provided agy has been used there
+        if home.join(".gemini").join("antigravity-cli").exists() {
+            profiles.push(home.clone());
+        }
+
+        // Extra profiles: any ~/.agy-* directories
+        if let Ok(entries) = std::fs::read_dir(&home) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.starts_with(".agy-") && entry.path().is_dir() {
+                    profiles.push(entry.path());
+                }
+            }
+        }
+
+        // Always include default home as a fallback so the first-run path works
+        if profiles.is_empty() {
+            profiles.push(home);
+        }
+    }
+
+    profiles
+}
+
 pub fn query_antigravity_usage(agy_home: Option<&str>) -> AntigravityUsageResult {
     let bin = match find_agy_binary() {
         Some(b) => b,

@@ -49,6 +49,7 @@ pub fn run() {
             commands::query_antigravity,
             commands::refresh_account,
             commands::refresh_all_accounts,
+            commands::auto_import_profiles,
             commands::get_setting,
             commands::set_setting,
             commands::set_window_visible,

@@ -56,7 +56,7 @@ impl SchedulerHandle {
     }
 }
 
-/// Refresh every enabled account and persist snapshots to SQLite.
+/// Refresh every enabled account and persist snapshots + updated metadata to SQLite.
 fn run_refresh_cycle(db_conn: &Arc<Mutex<rusqlite::Connection>>) {
     let conn = match db_conn.lock() {
         Ok(c) => c,
@@ -72,18 +72,14 @@ fn run_refresh_cycle(db_conn: &Arc<Mutex<rusqlite::Connection>>) {
     drop(conn);
 
     for acc in accounts.into_iter().filter(|a| a.enabled) {
-        let windows = fetch_windows_for_account(&acc);
+        let (windows, updated_acc) = fetch_windows_for_account(&acc);
         if windows.is_empty() {
             continue;
         }
 
-        let now = chrono::Utc::now().to_rfc3339();
-        let mut updated_acc = acc.clone();
-        updated_acc.last_checked_at = Some(now.clone());
-        updated_acc.updated_at = now.clone();
-
         // Re-acquire lock just for the write
         if let Ok(conn) = db_conn.lock() {
+            // Write back email / plan / last_checked_at discovered during the fetch
             let _ = db::save_account(&conn, &updated_acc);
             for snap in &windows {
                 let _ = db::save_usage_snapshot(&conn, snap);
@@ -92,12 +88,19 @@ fn run_refresh_cycle(db_conn: &Arc<Mutex<rusqlite::Connection>>) {
     }
 }
 
-fn fetch_windows_for_account(acc: &AccountRecord) -> Vec<UsageWindowRecord> {
+/// Query the provider for one account and return both the new snapshots and the
+/// updated account record (with email / plan / last_checked_at filled in).
+fn fetch_windows_for_account(acc: &AccountRecord) -> (Vec<UsageWindowRecord>, AccountRecord) {
     let now = chrono::Utc::now().to_rfc3339();
     let mut snapshots = Vec::new();
+    let mut updated_acc = acc.clone();
+    updated_acc.last_checked_at = Some(now.clone());
+    updated_acc.updated_at = now.clone();
 
     if acc.provider == "codex" {
-        let codex_home = if acc.auth_profile_id.starts_with('/') || acc.auth_profile_id.starts_with('~') {
+        let codex_home = if acc.auth_profile_id.starts_with('/')
+            || acc.auth_profile_id.starts_with('~')
+        {
             Some(acc.auth_profile_id.clone())
         } else {
             None
@@ -105,6 +108,10 @@ fn fetch_windows_for_account(acc: &AccountRecord) -> Vec<UsageWindowRecord> {
 
         let res = codex::query_codex_rate_limits(codex_home.as_deref());
         if res.success {
+            if let Some(email) = res.email { updated_acc.email = Some(email); }
+            if let Some(plan) = res.plan_type { updated_acc.plan = Some(plan); }
+            if let Some(act_id) = res.account_id { updated_acc.provider_account_id = Some(act_id); }
+
             for w in res.windows {
                 snapshots.push(UsageWindowRecord {
                     id: uuid::Uuid::new_v4().to_string(),
@@ -122,13 +129,17 @@ fn fetch_windows_for_account(acc: &AccountRecord) -> Vec<UsageWindowRecord> {
             }
         }
     } else if acc.provider == "antigravity" {
-        let agy_home = if acc.auth_profile_id != "default" && !acc.auth_profile_id.trim().is_empty() {
+        let agy_home = if acc.auth_profile_id != "default"
+            && !acc.auth_profile_id.trim().is_empty()
+        {
             Some(acc.auth_profile_id.clone())
         } else {
             None
         };
         let res = antigravity::query_antigravity_usage(agy_home.as_deref());
         if res.success {
+            if let Some(email) = res.email { updated_acc.email = Some(email); }
+
             for w in res.windows {
                 snapshots.push(UsageWindowRecord {
                     id: uuid::Uuid::new_v4().to_string(),
@@ -147,7 +158,7 @@ fn fetch_windows_for_account(acc: &AccountRecord) -> Vec<UsageWindowRecord> {
         }
     }
 
-    snapshots
+    (snapshots, updated_acc)
 }
 
 /// Spawn the background scheduler on a dedicated Tokio runtime thread.
