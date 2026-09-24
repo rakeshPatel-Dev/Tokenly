@@ -15,6 +15,9 @@ export function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark"
+  );
 
   const refreshIntervalRef = useRef<number | null>(null);
 
@@ -184,41 +187,29 @@ export function App() {
     loadAccountsAndUsage();
   }, [loadAccountsAndUsage]);
 
-  // Calculate earliest reset banner for Header
-  let nextResetBanner: string | undefined;
-  let minResetTime = Infinity;
-  for (const acc of accounts) {
-    const windows = usageMap[acc.id] || [];
-    for (const w of windows) {
-      if (w.resetAt) {
-        const ts = new Date(w.resetAt).getTime();
-        if (!isNaN(ts) && ts > Date.now() && ts < minResetTime) {
-          minResetTime = ts;
-          const diffMin = Math.round((ts - Date.now()) / 60000);
-          if (diffMin < 60) {
-            nextResetBanner = `in ${diffMin}m (${acc.displayName || acc.provider})`;
-          } else {
-            const hrs = Math.floor(diffMin / 60);
-            const mins = diffMin % 60;
-            nextResetBanner = `in ${hrs}h ${mins}m (${acc.displayName || acc.provider})`;
-          }
-        }
-      }
-    }
-  }
+  // Theme toggle
+  const handleToggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme", next);
+    try {
+      localStorage.setItem("tokenly-theme", next);
+    } catch {}
+  };
 
   return (
-    <div className="min-h-screen bg-[#080c12] text-stone-200 flex flex-col selection:bg-blue-400 selection:text-white">
+    <div className="flex min-h-screen flex-col bg-[var(--t-bg)] text-[var(--t-ink-2)]">
       <Header
         accountCount={accounts.length}
         isRefreshing={isRefreshingAll}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
         onRefreshAll={handleRefreshAll}
         onOpenAddModal={() => setIsAddModalOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        nextResetText={nextResetBanner}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-7">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-6">
         <Dashboard
           accounts={accounts}
           usageMap={usageMap}
