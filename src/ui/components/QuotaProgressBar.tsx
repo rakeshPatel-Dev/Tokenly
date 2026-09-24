@@ -7,6 +7,18 @@ interface Props {
   size?: "sm" | "md" | "lg";
 }
 
+const sizes: Record<NonNullable<Props["size"]>, string> = {
+  sm: "h-[3px]",
+  md: "h-[5px]",
+  lg: "h-2",
+};
+
+function tier(normalized: number) {
+  if (normalized < 20) return { fill: "bg-[var(--t-red)]", text: "text-[var(--t-red)]" };
+  if (normalized < 50) return { fill: "bg-[var(--t-amber)]", text: "text-[var(--t-amber)]" };
+  return { fill: "bg-[var(--t-green)]", text: "text-[var(--t-green)]" };
+}
+
 export const QuotaProgressBar: React.FC<Props> = ({
   remainingPercent,
   usedPercent,
@@ -15,56 +27,38 @@ export const QuotaProgressBar: React.FC<Props> = ({
 }) => {
   if (remainingPercent === undefined && usedPercent === undefined) {
     return (
-      <div className="w-full">
-        <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
-          <div className="h-full bg-slate-800 w-full animate-pulse" />
+      <div className="space-y-1.5">
+        <div className={`track ${sizes[size]} overflow-hidden`}>
+          <div className={`fill ${sizes[size]} w-0`} />
         </div>
-        {showText && (
-          <div className="text-[11px] text-slate-500 mt-1 font-mono tracking-wide">
-            Quota unavailable
-          </div>
-        )}
+        {showText && <p className="text-[11px] text-[var(--t-ink-8)]">No data</p>}
       </div>
     );
   }
 
   const rem = remainingPercent ?? (100 - (usedPercent ?? 0));
   const normalized = Math.max(0, Math.min(100, rem));
-
-  // Solid color tiers — no gradients
-  let barColor = "bg-blue-500";
-  let percentColor = "text-blue-400";
-
-  if (normalized < 20) {
-    barColor = "bg-rose-600";
-    percentColor = "text-rose-400";
-  } else if (normalized < 50) {
-    barColor = "bg-blue-600";
-    percentColor = "text-blue-300";
-  }
-
-  const heightClass = size === "sm" ? "h-1" : size === "lg" ? "h-2.5" : "h-1.5";
+  const t = tier(normalized);
 
   return (
-    <div className="w-full space-y-2">
-      <div className={`w-full ${heightClass} bg-[#111827] rounded-full overflow-hidden border border-blue-950/40`}>
+    <div className="space-y-1.5">
+      <div className={`track ${sizes[size]} overflow-hidden`}>
         <div
-          className={`${heightClass} ${barColor} rounded-full transition-all duration-700 ease-out`}
+          className={`fill ${sizes[size]} ${t.fill}`}
           style={{ width: `${normalized}%` }}
         />
       </div>
 
       {showText && (
-        <div className="flex items-center justify-between text-[11px] font-mono tracking-tight">
-          <div className="flex items-center gap-1.5">
-            <span className={`font-semibold ${percentColor} tabular-nums text-xs`}>
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="flex items-center gap-1.5">
+            {normalized < 20 && <span className={`font-medium ${t.text}`}>Low</span>}
+            <span className={`num font-medium ${t.text}`}>
               {normalized.toFixed(normalized % 1 === 0 ? 0 : 1)}%
             </span>
-            <span className="text-slate-500 uppercase text-[10px] tracking-wider">
-              remaining
-            </span>
-          </div>
-          <span className="text-slate-500 text-[10px] tabular-nums">
+            <span className="text-[var(--t-ink-6)]">left</span>
+          </span>
+          <span className="num text-[var(--t-ink-8)]">
             {(100 - normalized).toFixed(0)}% used
           </span>
         </div>

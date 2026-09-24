@@ -6,71 +6,24 @@ interface Props {
   className?: string;
 }
 
+const config: Record<ConnectionStatus, { label: string; dot: string; text: string }> = {
+  connected: { label: "Active", dot: "mark mark-green", text: "text-[var(--t-green)]" },
+  refreshing: { label: "Syncing", dot: "mark mark-amber", text: "text-[var(--t-amber)]" },
+  stale: { label: "Outdated", dot: "mark mark-amber", text: "text-[var(--t-amber)]" },
+  unavailable: { label: "Offline", dot: "mark mark-red", text: "text-[var(--t-red)]" },
+  unauthenticated: { label: "Signed out", dot: "mark mark-red", text: "text-[var(--t-red)]" },
+  identity_unverified: { label: "Unverified", dot: "mark mark-amber", text: "text-[var(--t-amber)]" },
+  unsupported: { label: "Unsupported", dot: "mark mark-gray", text: "text-[var(--t-ink-5)]" },
+  error: { label: "Error", dot: "mark mark-red", text: "text-[var(--t-red)]" },
+};
+
 export const StatusBadge: React.FC<Props> = ({ status, className = "" }) => {
-  switch (status) {
-    case "connected":
-      return (
-        <span
-          className={`inline-flex items-center gap-1.5 font-mono text-[10px] tracking-wider uppercase text-stone-400 ${className}`}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
-          Active
-        </span>
-      );
-    case "refreshing":
-      return (
-        <span
-          className={`inline-flex items-center gap-1.5 font-mono text-[10px] tracking-wider uppercase text-blue-400 animate-pulse ${className}`}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_6px_rgba(245,158,11,0.6)]" />
-          Syncing
-        </span>
-      );
-    case "stale":
-      return (
-        <span
-          className={`inline-flex items-center gap-1.5 font-mono text-[10px] tracking-wider uppercase text-blue-500/80 ${className}`}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-          Stale
-        </span>
-      );
-    case "unauthenticated":
-      return (
-        <span
-          className={`inline-flex items-center gap-1.5 font-mono text-[10px] tracking-wider uppercase text-rose-400 ${className}`}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.5)]" />
-          Auth Required
-        </span>
-      );
-    case "identity_unverified":
-      return (
-        <span
-          className={`inline-flex items-center gap-1.5 font-mono text-[10px] tracking-wider uppercase text-blue-300/80 ${className}`}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-400/80" />
-          Unverified
-        </span>
-      );
-    case "unavailable":
-      return (
-        <span
-          className={`inline-flex items-center gap-1.5 font-mono text-[10px] tracking-wider uppercase text-stone-500 ${className}`}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-stone-600" />
-          Offline
-        </span>
-      );
-    case "error":
-    default:
-      return (
-        <span
-          className={`inline-flex items-center gap-1.5 font-mono text-[10px] tracking-wider uppercase text-rose-400 ${className}`}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-          Error
-        </span>
-      );
-  }
+  const cfg = config[status] ?? config.error;
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[11px] ${cfg.text} ${className}`}>
+      <span className={cfg.dot} />
+      {cfg.label}
+    </span>
+  );
 };

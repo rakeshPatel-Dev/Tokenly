@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Account, UsageWindow } from "../../types";
 import { AccountCard } from "./AccountCard";
-import { Plus, Search, Radio, Compass } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 
 interface Props {
   accounts: Account[];
@@ -9,6 +9,31 @@ interface Props {
   onRefreshAccount: (accountId: string) => Promise<void>;
   onSelectAccount: (account: Account) => void;
   onOpenAddModal: () => void;
+}
+
+function timeUntil(iso: string | undefined): string {
+  if (!iso) return "";
+  const ms = new Date(iso).getTime() - Date.now();
+  if (Number.isNaN(ms)) return "";
+  if (ms <= 0) return "now";
+  const m = Math.floor(ms / 60000);
+  if (m < 60) return `in ${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `in ${h}h ${m % 60}m`;
+  const d = Math.floor(h / 24);
+  return `in ${d}d`;
+}
+
+function quotaTone(pct: number): string {
+  if (pct < 20) return "text-[var(--t-red)]";
+  if (pct < 50) return "text-[var(--t-amber)]";
+  return "text-[var(--t-green)]";
+}
+
+function resetTone(iso: string | undefined): string {
+  if (!iso) return "";
+  const diff = new Date(iso).getTime() - Date.now();
+  return diff > 0 && diff < 86400000 ? "text-[var(--t-amber)]" : "text-[var(--t-ink-2)]";
 }
 
 export const Dashboard: React.FC<Props> = ({
@@ -21,46 +46,34 @@ export const Dashboard: React.FC<Props> = ({
   const [filterProvider, setFilterProvider] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Determine optimal account for next task
-  let bestAccount: { account: Account; remainingPercent: number; name: string } | null = null;
-  let nextResetAccount: { account: Account; resetAt: string; windowName: string } | null = null;
+  let bestAccount: { account: Account; remainingPercent: number } | null = null;
+  let nextResetAccount: { account: Account; resetAt: string } | null = null;
   let earliestResetTime = Infinity;
 
   for (const acc of accounts) {
     const windows = usageMap[acc.id] || [];
     for (const w of windows) {
-      if (w.remainingPercent !== undefined) {
-        if (!bestAccount || w.remainingPercent > bestAccount.remainingPercent) {
-          bestAccount = {
-            account: acc,
-            remainingPercent: w.remainingPercent,
-            name: w.name,
-          };
-        }
+      if (w.remainingPercent !== undefined && (!bestAccount || w.remainingPercent > bestAccount.remainingPercent)) {
+        bestAccount = { account: acc, remainingPercent: w.remainingPercent };
       }
       if (w.resetAt) {
         const time = new Date(w.resetAt).getTime();
-        if (!isNaN(time) && time > Date.now() && time < earliestResetTime) {
+        if (!Number.isNaN(time) && time > Date.now() && time < earliestResetTime) {
           earliestResetTime = time;
-          nextResetAccount = {
-            account: acc,
-            resetAt: w.resetAt,
-            windowName: w.name,
-          };
+          nextResetAccount = { account: acc, resetAt: w.resetAt };
         }
       }
     }
   }
 
-  // Filter accounts
   const filteredAccounts = accounts.filter((acc) => {
     if (filterProvider !== "all" && acc.provider !== filterProvider) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchName = (acc.displayName || "").toLowerCase().includes(q);
-      const matchEmail = (acc.email || "").toLowerCase().includes(q);
-      const matchProfile = (acc.authProfileId || "").toLowerCase().includes(q);
-      if (!matchName && !matchEmail && !matchProfile) return false;
+      const name = (acc.displayName || "").toLowerCase().includes(q);
+      const email = (acc.email || "").toLowerCase().includes(q);
+      const profile = (acc.authProfileId || "").toLowerCase().includes(q);
+      if (!name && !email && !profile) return false;
     }
     return true;
   });
@@ -69,160 +82,100 @@ export const Dashboard: React.FC<Props> = ({
   const agyAccounts = filteredAccounts.filter((a) => a.provider === "antigravity");
 
   return (
-    <div className="space-y-7">
-      {/* Top Editorial Intel: Deep Amber Textured Hero Cards */}
+    <div className="space-y-6">
       {accounts.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5">
-          {/* Card 1: Recommended Profile */}
-          <div className="textured-hero-card rounded-4xl p-6 transition-all">
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 font-mono text-[10px] tracking-widest text-blue-400 uppercase font-semibold">
-                <Compass className="w-3.5 h-3.5 text-blue-400" />
-                Optimal Quota Available
-              </div>
-
-              {bestAccount ? (
-                <div className="mt-3">
-                  <div className="flex items-baseline gap-2.5">
-                    <span className="text-2xl font-semibold tracking-tight text-stone-100">
-                      {bestAccount.account.displayName || bestAccount.account.provider}
-                    </span>
-                    <span className="font-mono text-xs text-blue-300/80">
-                      {bestAccount.account.email || bestAccount.account.authProfileId}
-                    </span>
-                  </div>
-                  <p className="text-xs font-mono text-stone-400 mt-1">
-                    <span className="text-blue-400 font-bold">
-                      {bestAccount.remainingPercent.toFixed(0)}%
-                    </span>{" "}
-                    capacity remaining on {bestAccount.name}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-xs font-mono text-stone-500 mt-3">
-                  Sync accounts to calculate quota recommendations.
-                </p>
-              )}
-            </div>
+        <div className="summary">
+          <div className="summary-cell">
+            <span className="summary-label">Most capacity</span>
+            {bestAccount ? (
+              <span className="summary-value">
+                {bestAccount.account.displayName || bestAccount.account.provider}
+                {" "}· <span className={`num font-medium ${quotaTone(bestAccount.remainingPercent)}`}>
+                  {bestAccount.remainingPercent.toFixed(0)}%
+                </span>{" "}
+                left
+              </span>
+            ) : (
+              <span className="summary-value text-[var(--t-ink-8)]">No data yet</span>
+            )}
           </div>
-
-          {/* Card 2: Next Refresh Window */}
-          <div className="textured-hero-card rounded-4xl p-6 transition-all">
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 font-mono text-[10px] tracking-widest text-blue-400 uppercase font-semibold">
-                <Radio className="w-3.5 h-3.5 text-blue-400" />
-                Upcoming Window Reset
-              </div>
-
-              {nextResetAccount ? (
-                <div className="mt-3">
-                  <div className="flex items-baseline gap-2.5">
-                    <span className="text-2xl font-semibold tracking-tight text-stone-100">
-                      {nextResetAccount.account.displayName || nextResetAccount.account.provider}
-                    </span>
-                    <span className="font-mono text-xs text-stone-400">
-                      ({nextResetAccount.windowName})
-                    </span>
-                  </div>
-                  <p className="text-xs font-mono text-blue-300 mt-1">
-                    {new Date(nextResetAccount.resetAt).toLocaleString(undefined, {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-xs font-mono text-stone-500 mt-3">
-                  No active reset timers reported by providers.
-                </p>
-              )}
-            </div>
+          <div className="summary-cell">
+            <span className="summary-label">Next reset</span>
+            {nextResetAccount ? (
+              <span className="summary-value">
+                {nextResetAccount.account.displayName || nextResetAccount.account.provider}
+                {" "}· <span className={resetTone(nextResetAccount.resetAt)}>
+                  {timeUntil(nextResetAccount.resetAt)}
+                </span>
+              </span>
+            ) : (
+              <span className="summary-value text-[var(--t-ink-8)]">None scheduled</span>
+            )}
           </div>
         </div>
       )}
 
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
-        <div className="flex items-center gap-1 bg-[#0b0f1a] p-1 rounded-2xl border border-blue-950/40 w-full sm:w-auto">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div className="seg">
           <button
+            className={filterProvider === "all" ? "active" : ""}
             onClick={() => setFilterProvider("all")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-mono transition-all ${
-              filterProvider === "all"
-                ? "bg-[#142040] text-blue-300 font-medium shadow-sm border border-blue-500/20"
-                : "text-stone-400 hover:text-stone-200"
-            }`}
           >
             All ({accounts.length})
           </button>
           <button
+            className={filterProvider === "codex" ? "active" : ""}
             onClick={() => setFilterProvider("codex")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-mono transition-all ${
-              filterProvider === "codex"
-                ? "bg-[#142040] text-blue-300 font-medium shadow-sm border border-blue-500/20"
-                : "text-stone-400 hover:text-stone-200"
-            }`}
           >
             Codex ({accounts.filter((a) => a.provider === "codex").length})
           </button>
           <button
+            className={filterProvider === "antigravity" ? "active" : ""}
             onClick={() => setFilterProvider("antigravity")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-mono transition-all ${
-              filterProvider === "antigravity"
-                ? "bg-[#142040] text-blue-300 font-medium shadow-sm border border-blue-500/20"
-                : "text-stone-400 hover:text-stone-200"
-            }`}
           >
             Antigravity ({accounts.filter((a) => a.provider === "antigravity").length})
           </button>
         </div>
 
-        <div className="relative w-full sm:w-72">
-          <Search className="w-3.5 h-3.5 text-stone-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--t-ink-8)]" />
           <input
             type="text"
-            placeholder="Filter profiles or emails..."
+            placeholder="Find an account"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#0b0f1a] border border-blue-950/40 rounded-2xl pl-9 pr-3.5 py-1.5 text-xs font-mono text-stone-100 placeholder-stone-600 focus:outline-none focus:border-blue-600/40"
+            className="input py-1.5 pl-8 pr-3 text-[12px]"
           />
         </div>
       </div>
 
-      {/* Main Grid with 4xl rounded textured cards */}
       {filteredAccounts.length === 0 ? (
-        <div className="p-16 text-center rounded-4xl textured-blue-card border border-blue-950/40 space-y-4">
-          <div className="relative z-10 max-w-sm mx-auto space-y-3">
-            <h3 className="text-base font-semibold text-stone-200">No accounts configured</h3>
-            <p className="text-xs font-mono text-stone-500 leading-relaxed">
-              {accounts.length === 0
-                ? "Connect your local OpenAI Codex and Google Antigravity profiles to inspect quota balances."
-                : "No accounts matched your current filter criteria."}
-            </p>
-            {accounts.length === 0 && (
-              <button
-                onClick={onOpenAddModal}
-                className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition-all shadow-md"
-              >
-                <Plus className="w-4 h-4" />
-                Add First Profile
-              </button>
-            )}
-          </div>
+        <div className="panel px-6 py-14 text-center">
+          <h3 className="text-[14px] font-semibold text-[var(--t-ink)]">
+            {accounts.length === 0 ? "No accounts yet" : "Nothing to show"}
+          </h3>
+          <p className="mx-auto mt-1.5 max-w-sm text-[12.5px] text-[var(--t-ink-5)]">
+            {accounts.length === 0
+              ? "Link a Codex or Antigravity profile to track its credits."
+              : "No accounts match this filter."}
+          </p>
+          {accounts.length === 0 && (
+            <button onClick={onOpenAddModal} className="btn btn-primary mt-4">
+              <Plus className="h-3.5 w-3.5" />
+              Add account
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-8">
-          {/* Antigravity Section */}
           {(filterProvider === "all" || filterProvider === "antigravity") &&
             agyAccounts.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3.5 font-mono text-[11px] font-semibold text-blue-400/90 uppercase tracking-widest pl-1">
-                  Google Antigravity
-                  <span className="text-stone-600">({agyAccounts.length})</span>
+              <section>
+                <div className="mb-3 flex items-baseline gap-2">
+                  <span className="text-[13px] font-medium text-[var(--t-ink)]">Google Antigravity</span>
+                  <span className="text-[12px] text-[var(--t-ink-6)]">{agyAccounts.length}</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {agyAccounts.map((acc) => (
                     <AccountCard
                       key={acc.id}
@@ -233,18 +186,17 @@ export const Dashboard: React.FC<Props> = ({
                     />
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
-          {/* Codex Section */}
           {(filterProvider === "all" || filterProvider === "codex") &&
             codexAccounts.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3.5 font-mono text-[11px] font-semibold text-blue-400/90 uppercase tracking-widest pl-1">
-                  OpenAI Codex
-                  <span className="text-stone-600">({codexAccounts.length})</span>
+              <section>
+                <div className="mb-3 flex items-baseline gap-2">
+                  <span className="text-[13px] font-medium text-[var(--t-ink)]">OpenAI Codex</span>
+                  <span className="text-[12px] text-[var(--t-ink-6)]">{codexAccounts.length}</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {codexAccounts.map((acc) => (
                     <AccountCard
                       key={acc.id}
@@ -255,7 +207,7 @@ export const Dashboard: React.FC<Props> = ({
                     />
                   ))}
                 </div>
-              </div>
+              </section>
             )}
         </div>
       )}

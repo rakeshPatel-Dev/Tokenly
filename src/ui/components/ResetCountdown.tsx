@@ -7,25 +7,24 @@ interface Props {
 }
 
 export const ResetCountdown: React.FC<Props> = ({ resetAt, className = "" }) => {
-  const [timeText, setTimeText] = useState<string>("");
-  const [exactDateText, setExactDateText] = useState<string>("");
+  const [timeText, setTimeText] = useState("");
+  const [exact, setExact] = useState("");
+  const [soon, setSoon] = useState(false);
 
   useEffect(() => {
     if (!resetAt) {
-      setTimeText("No reset");
-      setExactDateText("");
+      setTimeText("");
+      setExact("");
+      setSoon(false);
       return;
     }
 
     const update = () => {
       const target = new Date(resetAt).getTime();
-      const now = Date.now();
-      const diffMs = target - now;
-
       try {
-        const dateObj = new Date(resetAt);
-        setExactDateText(
-          dateObj.toLocaleString(undefined, {
+        setExact(
+          new Date(resetAt).toLocaleString(undefined, {
+            weekday: "short",
             month: "short",
             day: "numeric",
             hour: "2-digit",
@@ -33,47 +32,50 @@ export const ResetCountdown: React.FC<Props> = ({ resetAt, className = "" }) => 
           })
         );
       } catch {
-        setExactDateText(resetAt);
+        setExact(resetAt);
       }
 
-      if (isNaN(target)) {
-        setTimeText("Unknown");
+      if (Number.isNaN(target)) {
+        setTimeText("unknown");
+        setSoon(false);
         return;
       }
 
-      if (diffMs <= 0) {
-        setTimeText("Resetting");
+      const diff = target - Date.now();
+      setSoon(diff > 0 && diff < 86400000);
+
+      if (diff <= 0) {
+        setTimeText("now");
         return;
       }
 
-      const diffSecs = Math.floor(diffMs / 1000);
-      const days = Math.floor(diffSecs / 86400);
-      const hours = Math.floor((diffSecs % 86400) / 3600);
-      const minutes = Math.floor((diffSecs % 3600) / 60);
+      const s = Math.floor(diff / 1000);
+      const d = Math.floor(s / 86400);
+      const h = Math.floor((s % 86400) / 3600);
+      const m = Math.floor((s % 3600) / 60);
 
-      if (days > 0) {
-        setTimeText(`${days}d ${hours}h`);
-      } else if (hours > 0) {
-        setTimeText(`${hours}h ${minutes}m`);
-      } else {
-        setTimeText(`${Math.max(1, minutes)}m`);
-      }
+      if (d > 0) setTimeText(`${d}d ${h}h`);
+      else if (h > 0) setTimeText(`${h}h ${m}m`);
+      else setTimeText(`${Math.max(1, m)}m`);
     };
 
     update();
-    const interval = setInterval(update, 30000);
-    return () => clearInterval(interval);
+    const id = setInterval(update, 30000);
+    return () => clearInterval(id);
   }, [resetAt]);
 
   if (!resetAt) return null;
 
   return (
-    <div
-      className={`inline-flex items-center gap-1.5 font-mono text-[11px] text-stone-400 ${className}`}
-      title={exactDateText ? `Exact reset: ${exactDateText}` : undefined}
+    <span
+      className={`inline-flex items-center gap-1 whitespace-nowrap ${className}`}
+      title={exact ? `Resets ${exact}` : undefined}
     >
-      <Clock className="w-3 h-3 text-blue-500/70 shrink-0" />
-      <span>resets in <span className="text-blue-200/90 font-medium">{timeText}</span></span>
-    </div>
+      <Clock className={`h-3 w-3 shrink-0 ${soon ? "text-[var(--t-amber)]" : "text-[var(--t-ink-7)]"}`} />
+      <span>
+        resets{" "}
+        <span className={soon ? "text-[var(--t-amber)]" : "text-[var(--t-ink-5)]"}>{timeText}</span>
+      </span>
+    </span>
   );
 };
