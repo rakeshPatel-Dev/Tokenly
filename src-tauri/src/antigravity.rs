@@ -46,19 +46,75 @@ pub struct AntigravityNormalizedWindow {
 }
 
 pub fn find_agy_binary() -> Option<PathBuf> {
-    if let Ok(out) = Command::new("which").arg("agy").output() {
-        if out.status.success() {
-            let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !p.is_empty() {
-                return Some(PathBuf::from(p));
+    // 1. Check PATH entries
+    if let Some(paths) = std::env::var_os("PATH") {
+        for dir in std::env::split_paths(&paths) {
+            let candidate = dir.join("agy");
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+            #[cfg(target_os = "windows")]
+            {
+                for ext in &["exe", "cmd", "bat"] {
+                    let with_ext = dir.join(format!("agy.{}", ext));
+                    if with_ext.is_file() {
+                        return Some(with_ext);
+                    }
+                }
             }
         }
     }
-    let home = dirs::home_dir()?;
-    let fallback = home.join(".local").join("bin").join("agy");
-    if fallback.exists() {
-        return Some(fallback);
+
+    // 2. Check common installation directories
+    if let Some(home) = dirs::home_dir() {
+        #[allow(unused_mut)]
+        let mut candidates = vec![
+            home.join(".local").join("bin").join("agy"),
+            home.join(".cargo").join("bin").join("agy"),
+        ];
+
+        #[cfg(target_os = "macos")]
+        {
+            candidates.push(PathBuf::from("/opt/homebrew/bin/agy"));
+            candidates.push(PathBuf::from("/usr/local/bin/agy"));
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            candidates.push(home.join("AppData").join("Roaming").join("npm").join("agy.cmd"));
+            candidates.push(home.join("AppData").join("Local").join("Programs").join("agy").join("agy.exe"));
+        }
+
+        for c in candidates {
+            if c.is_file() {
+                return Some(c);
+            }
+        }
     }
+
+    // 3. Platform-appropriate CLI lookup tool
+    #[cfg(target_os = "windows")]
+    let tool = "where";
+    #[cfg(not(target_os = "windows"))]
+    let tool = "which";
+
+    if let Ok(out) = Command::new(tool).arg("agy").output() {
+        if out.status.success() {
+            let first_line = String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .next()
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            if !first_line.is_empty() {
+                let p = PathBuf::from(first_line);
+                if p.is_file() {
+                    return Some(p);
+                }
+            }
+        }
+    }
+
     None
 }
 

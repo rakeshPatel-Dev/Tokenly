@@ -48,19 +48,75 @@ pub struct CodexNormalizedWindow {
 }
 
 pub fn find_codex_binary() -> Option<PathBuf> {
-    if let Ok(out) = Command::new("which").arg("codex").output() {
-        if out.status.success() {
-            let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !p.is_empty() {
-                return Some(PathBuf::from(p));
+    // 1. Check PATH entries
+    if let Some(paths) = std::env::var_os("PATH") {
+        for dir in std::env::split_paths(&paths) {
+            let candidate = dir.join("codex");
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+            #[cfg(target_os = "windows")]
+            {
+                for ext in &["exe", "cmd", "bat"] {
+                    let with_ext = dir.join(format!("codex.{}", ext));
+                    if with_ext.is_file() {
+                        return Some(with_ext);
+                    }
+                }
             }
         }
     }
-    let home = dirs::home_dir()?;
-    let fallback = home.join(".local").join("bin").join("codex");
-    if fallback.exists() {
-        return Some(fallback);
+
+    // 2. Check common installation directories (Homebrew on macOS, npm on Windows/Linux)
+    if let Some(home) = dirs::home_dir() {
+        #[allow(unused_mut)]
+        let mut candidates = vec![
+            home.join(".local").join("bin").join("codex"),
+            home.join(".cargo").join("bin").join("codex"),
+        ];
+
+        #[cfg(target_os = "macos")]
+        {
+            candidates.push(PathBuf::from("/opt/homebrew/bin/codex"));
+            candidates.push(PathBuf::from("/usr/local/bin/codex"));
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            candidates.push(home.join("AppData").join("Roaming").join("npm").join("codex.cmd"));
+            candidates.push(home.join("AppData").join("Local").join("Programs").join("codex").join("codex.exe"));
+        }
+
+        for c in candidates {
+            if c.is_file() {
+                return Some(c);
+            }
+        }
     }
+
+    // 3. Platform-appropriate CLI lookup tool
+    #[cfg(target_os = "windows")]
+    let tool = "where";
+    #[cfg(not(target_os = "windows"))]
+    let tool = "which";
+
+    if let Ok(out) = Command::new(tool).arg("codex").output() {
+        if out.status.success() {
+            let first_line = String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .next()
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            if !first_line.is_empty() {
+                let p = PathBuf::from(first_line);
+                if p.is_file() {
+                    return Some(p);
+                }
+            }
+        }
+    }
+
     None
 }
 
