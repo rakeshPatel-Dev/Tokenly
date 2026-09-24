@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import { Account, UsageWindow } from "./types";
 import { api } from "./core/api";
 import { Header } from "./ui/components/Header";
@@ -241,6 +242,9 @@ export function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
+
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
   );
 }
